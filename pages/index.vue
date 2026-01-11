@@ -7,7 +7,7 @@
     </div>
     
     <!-- 统计卡片 -->
-    <ChartsStatsCards :cards="statsCards" :loading="loading" />
+    <StatsCards :cards="statsCards" :loading="loading" />
     
     <!-- 图表区域 -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
@@ -19,7 +19,7 @@
             <span>下载任务统计</span>
           </div>
         </template>
-        <ChartsTrafficChart 
+        <TrafficChart 
           :data="downloadChartData" 
           type="pie" 
           :height="280"
@@ -34,7 +34,7 @@
             <span>转译任务统计</span>
           </div>
         </template>
-        <ChartsTrafficChart 
+        <TrafficChart 
           :data="transcodeChartData" 
           type="pie" 
           :height="280"
