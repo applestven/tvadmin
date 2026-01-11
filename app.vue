@@ -1,7 +1,9 @@
 <template>
-  <NuxtLayout>
-    <NuxtPage :transition="{ name: 'page', mode: 'out-in' }" />
-  </NuxtLayout>
+  <ConfigProvider :locale="locale">
+    <NuxtLayout>
+      <NuxtPage :transition="{ name: 'page', mode: 'out-in' }" />
+    </NuxtLayout>
+  </ConfigProvider>
 </template>
 
 <script setup lang="ts">
