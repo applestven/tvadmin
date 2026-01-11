@@ -1,10 +1,13 @@
-import type { 
-  TvTask, 
-  TvTaskQueryParams, 
-  DownloadRequest, 
+import type {
+  TvTask,
+  TvTaskQueryParams,
+  DownloadRequest,
   DownloadResponse,
   RunningTasksResponse,
-  TvStats 
+  TvStats,
+  AdminLog,
+  CreateAdminLogDto,
+  UpdateAdminLogDto,
 } from '~/types/tv'
 import type { ApiResponse } from '~/types/api'
 
@@ -13,35 +16,35 @@ import type { ApiResponse } from '~/types/api'
  */
 export function useTvApi() {
   const api = useApi()
-  
+
   /**
    * 获取任务列表 (多条件查询)
    */
   async function queryTasks(params: TvTaskQueryParams = {}) {
     return await api.post<ApiResponse<TvTask[]>>('/tv/tasks/query', params)
   }
-  
+
   /**
    * 获取任务详情
    */
   async function getTask(id: string) {
     return await api.get<TvTask>(`/tv/task/${id}`)
   }
-  
+
   /**
    * 提交下载任务
    */
   async function submitDownload(data: DownloadRequest) {
     return await api.post<DownloadResponse>('/tv/download', data)
   }
-  
+
   /**
    * 获取运行中的任务
    */
   async function getRunningTasks() {
     return await api.get<RunningTasksResponse>('/tv/c')
   }
-  
+
   /**
    * 获取统计数据
    */
@@ -53,10 +56,10 @@ export function useTvApi() {
       queryTasks({ filters: { status: 'running' }, page: 1, limit: 1 }),
       queryTasks({ filters: { status: 'pending' }, page: 1, limit: 1 }),
     ])
-    
+
     // 从响应中获取 total 或使用 data 长度
     const getTotal = (res: any) => res?.total ?? res?.data?.length ?? 0
-    
+
     return {
       totalTasks: getTotal(successRes) + getTotal(failedRes) + getTotal(runningRes) + getTotal(pendingRes),
       successTasks: getTotal(successRes),
@@ -65,12 +68,55 @@ export function useTvApi() {
       pendingTasks: getTotal(pendingRes),
     }
   }
-  
+
+  // ==================== 管理员日志 API ====================
+
+  /**
+   * 获取所有管理员日志
+   */
+  async function getAdminLogs() {
+    return await api.get<AdminLog[]>('/tv/admin-log')
+  }
+
+  /**
+   * 获取单条管理员日志
+   */
+  async function getAdminLog(id: string) {
+    return await api.get<AdminLog>(`/tv/admin-log/${id}`)
+  }
+
+  /**
+   * 创建管理员日志
+   */
+  async function createAdminLog(data: CreateAdminLogDto) {
+    return await api.post<AdminLog>('/tv/admin-log', data)
+  }
+
+  /**
+   * 更新管理员日志
+   */
+  async function updateAdminLog(id: string, data: UpdateAdminLogDto) {
+    return await api.put<AdminLog>(`/tv/admin-log/${id}`, data)
+  }
+
+  /**
+   * 删除管理员日志
+   */
+  async function deleteAdminLog(id: string) {
+    return await api.delete<{ success: boolean }>(`/tv/admin-log/${id}`)
+  }
+
   return {
     queryTasks,
     getTask,
     submitDownload,
     getRunningTasks,
     getStats,
+    // 管理员日志
+    getAdminLogs,
+    getAdminLog,
+    createAdminLog,
+    updateAdminLog,
+    deleteAdminLog,
   }
 }

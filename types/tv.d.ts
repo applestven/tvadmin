@@ -72,3 +72,33 @@ export interface TvStats {
   pendingTasks: number
   totalDownloadSize?: number
 }
+
+// ==================== 管理员日志相关类型 ====================
+
+// 管理员日志
+export interface AdminLog {
+  id: string
+  name: string
+  address: string
+  created_at: string
+}
+
+// 创建管理员日志请求
+export interface CreateAdminLogDto {
+  name: string
+  address: string
+}
+
+// 更新管理员日志请求
+export interface UpdateAdminLogDto {
+  name?: string
+  address?: string
+}
+
+// 管理员日志查询参数
+export interface AdminLogQueryParams {
+  page?: number
+  pageSize?: number
+  name?: string
+  address?: string
+}
