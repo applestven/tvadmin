@@ -23,16 +23,16 @@
         
         <!-- 自定义导航菜单 -->
         <nav class="mt-4 px-3">
-          <div
+          <NuxtLink
             v-for="item in menuItems"
             :key="item.key"
+            :to="item.key"
             class="nav-item"
             :class="{ 'nav-item-active': isActive(item.key) }"
-            @click="goTo(item.key)"
           >
             <component :is="item.icon" class="nav-icon" />
             <span v-if="!collapsed" class="nav-text">{{ item.label }}</span>
-          </div>
+          </NuxtLink>
         </nav>
       </a-layout-sider>
 
@@ -147,12 +147,6 @@ function isActive(path: string) {
   return route.path.startsWith(path)
 }
 
-// 导航函数
-function goTo(path: string) {
-  console.log('Navigation to:', path)
-  navigateTo(path)
-}
-
 // 当前页面标题
 const currentPageTitle = computed(() => {
   const path = route.path
@@ -181,3 +175,46 @@ onMounted(() => {
   startPolling()
 })
 </script>
+<style scoped>
+  .ant-layout-sider-children {
+    overflow-y: auto !important;
+    overflow-x: hidden;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    margin: 4px 0;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.65);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    user-select: none;
+  }
+
+  .nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .nav-item-active {
+    background-color: rgba(139, 92, 246, 0.3);
+    color: rgba(255, 255, 255, 1);
+    border-left: 3px solid rgb(139, 92, 246);
+    padding-left: 13px;
+  }
+
+  .nav-icon {
+    font-size: 18px;
+    min-width: 18px;
+    display: flex;
+    align-items: center;
+  }
+
+  .nav-text {
+    white-space: nowrap;
+  }
+</style>
