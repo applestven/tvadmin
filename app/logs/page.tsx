@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -12,202 +13,518 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { RefreshCw, Pause, Play, Trash2 } from 'lucide-react'
+import { RefreshCw, Pause, Play, Trash2, Plus, Edit, X, ExternalLink, Maximize2, Minimize2 } from 'lucide-react'
+import { useAdminLogApi } from '@/hooks'
+import type { AdminLog, CreateAdminLogDto } from '@/types'
 
-interface LogContainer {
+interface LogViewerState {
   id: string
-  name: string
-  service: 'tv' | 'dv'
-  logs: string[]
+  isAutoRefresh: boolean
+  refreshInterval: number // 秒
+  isFullscreen: boolean
+  iframeKey: number // 用于强制刷新 iframe
 }
 
 export default function LogsPage() {
-  const [containers, setContainers] = useState<LogContainer[]>([
-    { id: '1', name: 'TV Service', service: 'tv', logs: [] },
-    { id: '2', name: 'DV Service', service: 'dv', logs: [] },
-  ])
-  const [selectedContainers, setSelectedContainers] = useState<string[]>(['1', '2'])
-  const [isPaused, setIsPaused] = useState(false)
-  const [autoScroll, setAutoScroll] = useState(true)
-  const scrollRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
+  const { loading, error, getAdminLogs, createAdminLog, updateAdminLog, deleteAdminLog } = useAdminLogApi()
+  
+  const [adminLogs, setAdminLogs] = useState<AdminLog[]>([])
+  const [logViewerStates, setLogViewerStates] = useState<Map<string, LogViewerState>>(new Map())
+  const [selectedLogs, setSelectedLogs] = useState<string[]>([])
+  
+  // 表单状态
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [editingLog, setEditingLog] = useState<AdminLog | null>(null)
+  const [formData, setFormData] = useState<CreateAdminLogDto>({ name: '', address: '' })
+  
+  // 自动刷新定时器引用
+  const refreshTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map())
 
-  // 模拟获取日志
+  // 获取管理员日志列表
+  const fetchAdminLogs = useCallback(async () => {
+    try {
+      const logs = await getAdminLogs()
+      setAdminLogs(logs)
+      
+      // 初始化每个日志的查看器状态
+      const newStates = new Map<string, LogViewerState>()
+      logs.forEach((log: AdminLog) => {
+        const existingState = logViewerStates.get(log.id)
+        newStates.set(log.id, existingState || {
+          id: log.id,
+          isAutoRefresh: false,
+          refreshInterval: 3,
+          isFullscreen: false,
+          iframeKey: 0,
+        })
+      })
+      setLogViewerStates(newStates)
+      
+      // 默认选中所有日志
+      if (selectedLogs.length === 0 && logs.length > 0) {
+        setSelectedLogs(logs.map((log: AdminLog) => log.id))
+      }
+    } catch (err) {
+      console.error('获取管理员日志失败:', err)
+    }
+  }, [getAdminLogs])
+
+  // 初始加载
   useEffect(() => {
-    if (isPaused) return
+    fetchAdminLogs()
+  }, [])
 
-    const interval = setInterval(() => {
-      setContainers((prev) =>
-        prev.map((container) => ({
-          ...container,
-          logs: [
-            ...container.logs.slice(-100), // 保留最近 100 条
-            `[${new Date().toISOString()}] ${container.name} - Sample log message ${Math.random().toString(36).substring(7)}`,
-          ],
-        }))
-      )
-    }, 2000)
-
-    return () => clearInterval(interval)
-  }, [isPaused])
-
-  // 自动滚动到底部
+  // 处理自动刷新
   useEffect(() => {
-    if (!autoScroll) return
-
-    Object.keys(scrollRefs.current).forEach((key) => {
-      const el = scrollRefs.current[key]
-      if (el) {
-        el.scrollTop = el.scrollHeight
+    logViewerStates.forEach((state, id) => {
+      const existingTimer = refreshTimersRef.current.get(id)
+      
+      if (state.isAutoRefresh) {
+        // 如果已有定时器，先清除
+        if (existingTimer) {
+          clearInterval(existingTimer)
+        }
+        
+        // 创建新的定时器
+        const timer = setInterval(() => {
+          setLogViewerStates(prev => {
+            const newStates = new Map(prev)
+            const currentState = newStates.get(id)
+            if (currentState) {
+              newStates.set(id, {
+                ...currentState,
+                iframeKey: currentState.iframeKey + 1,
+              })
+            }
+            return newStates
+          })
+        }, state.refreshInterval * 1000)
+        
+        refreshTimersRef.current.set(id, timer)
+      } else {
+        // 清除定时器
+        if (existingTimer) {
+          clearInterval(existingTimer)
+          refreshTimersRef.current.delete(id)
+        }
       }
     })
-  }, [containers, autoScroll])
 
-  const handleClearLogs = (containerId: string) => {
-    setContainers((prev) =>
-      prev.map((c) => (c.id === containerId ? { ...c, logs: [] } : c))
-    )
+    // 清理函数
+    return () => {
+      refreshTimersRef.current.forEach((timer) => clearInterval(timer))
+    }
+  }, [logViewerStates])
+
+  // 手动刷新单个日志
+  const handleRefresh = (id: string) => {
+    setLogViewerStates(prev => {
+      const newStates = new Map(prev)
+      const state = newStates.get(id)
+      if (state) {
+        newStates.set(id, {
+          ...state,
+          iframeKey: state.iframeKey + 1,
+        })
+      }
+      return newStates
+    })
   }
 
+  // 切换自动刷新
+  const toggleAutoRefresh = (id: string) => {
+    setLogViewerStates(prev => {
+      const newStates = new Map(prev)
+      const state = newStates.get(id)
+      if (state) {
+        newStates.set(id, {
+          ...state,
+          isAutoRefresh: !state.isAutoRefresh,
+        })
+      }
+      return newStates
+    })
+  }
+
+  // 设置刷新间隔
+  const setRefreshInterval = (id: string, interval: number) => {
+    setLogViewerStates(prev => {
+      const newStates = new Map(prev)
+      const state = newStates.get(id)
+      if (state) {
+        newStates.set(id, {
+          ...state,
+          refreshInterval: interval,
+        })
+      }
+      return newStates
+    })
+  }
+
+  // 切换全屏
+  const toggleFullscreen = (id: string) => {
+    setLogViewerStates(prev => {
+      const newStates = new Map(prev)
+      const state = newStates.get(id)
+      if (state) {
+        newStates.set(id, {
+          ...state,
+          isFullscreen: !state.isFullscreen,
+        })
+      }
+      return newStates
+    })
+  }
+
+  // 创建日志
+  const handleCreate = async () => {
+    if (!formData.name || !formData.address) return
+    
+    try {
+      await createAdminLog(formData)
+      setFormData({ name: '', address: '' })
+      setShowAddForm(false)
+      fetchAdminLogs()
+    } catch (err) {
+      console.error('创建日志失败:', err)
+    }
+  }
+
+  // 更新日志
+  const handleUpdate = async () => {
+    if (!editingLog || !formData.name || !formData.address) return
+    
+    try {
+      await updateAdminLog(editingLog.id, formData)
+      setFormData({ name: '', address: '' })
+      setEditingLog(null)
+      fetchAdminLogs()
+    } catch (err) {
+      console.error('更新日志失败:', err)
+    }
+  }
+
+  // 删除日志
+  const handleDelete = async (id: string) => {
+    if (!confirm('确定要删除这个日志吗？')) return
+    
+    try {
+      await deleteAdminLog(id)
+      setSelectedLogs(prev => prev.filter(logId => logId !== id))
+      fetchAdminLogs()
+    } catch (err) {
+      console.error('删除日志失败:', err)
+    }
+  }
+
+  // 开始编辑
+  const startEdit = (log: AdminLog) => {
+    setEditingLog(log)
+    setFormData({ name: log.name, address: log.address })
+    setShowAddForm(false)
+  }
+
+  // 取消编辑/添加
+  const cancelForm = () => {
+    setEditingLog(null)
+    setShowAddForm(false)
+    setFormData({ name: '', address: '' })
+  }
+
+  // 获取网格列数
   const getGridCols = () => {
-    const count = selectedContainers.length
+    const count = selectedLogs.length
     if (count === 1) return 'grid-cols-1'
-    if (count === 2) return 'grid-cols-2'
-    if (count <= 4) return 'grid-cols-2'
-    if (count <= 6) return 'grid-cols-3'
-    return 'grid-cols-4'
+    if (count === 2) return 'grid-cols-1 lg:grid-cols-2'
+    if (count <= 4) return 'grid-cols-1 lg:grid-cols-2'
+    return 'grid-cols-1 lg:grid-cols-2 xl:grid-cols-3'
   }
 
-  const visibleContainers = containers.filter((c) =>
-    selectedContainers.includes(c.id)
-  )
+  const visibleLogs = adminLogs.filter(log => selectedLogs.includes(log.id))
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">日志监控</h2>
-          <p className="text-muted-foreground">实时查看服务运行日志</p>
+          <p className="text-muted-foreground">管理和查看服务日志</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            size="icon"
-            onClick={() => setIsPaused(!isPaused)}
+            size="sm"
+            onClick={fetchAdminLogs}
+            disabled={loading}
           >
-            {isPaused ? (
-              <Play className="h-4 w-4" />
-            ) : (
-              <Pause className="h-4 w-4" />
-            )}
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            刷新列表
           </Button>
           <Button
-            variant={autoScroll ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setAutoScroll(!autoScroll)}
+            onClick={() => {
+              setShowAddForm(true)
+              setEditingLog(null)
+              setFormData({ name: '', address: '' })
+            }}
           >
-            自动滚动
+            <Plus className="h-4 w-4 mr-2" />
+            添加日志
           </Button>
         </div>
       </div>
 
-      {/* 控制面板 */}
+      {/* 添加/编辑表单 */}
+      {(showAddForm || editingLog) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>{editingLog ? '编辑日志' : '添加新日志'}</span>
+              <Button variant="ghost" size="icon" onClick={cancelForm}>
+                <X className="h-4 w-4" />
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="name">日志名称</Label>
+                <Input
+                  id="name"
+                  placeholder="例如: TV 服务日志"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="address">日志地址 (URL)</Label>
+                <Input
+                  id="address"
+                  placeholder="例如: http://192.168.1.1:8080/logs"
+                  value={formData.address}
+                  onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="outline" onClick={cancelForm}>
+                取消
+              </Button>
+              <Button 
+                onClick={editingLog ? handleUpdate : handleCreate}
+                disabled={loading || !formData.name || !formData.address}
+              >
+                {editingLog ? '保存修改' : '创建日志'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 日志选择器 */}
       <Card>
         <CardHeader>
-          <CardTitle>容器选择</CardTitle>
+          <CardTitle>日志选择</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {containers.map((container) => (
-              <Badge
-                key={container.id}
-                variant={
-                  selectedContainers.includes(container.id)
-                    ? 'default'
-                    : 'outline'
-                }
-                className="cursor-pointer"
-                onClick={() => {
-                  setSelectedContainers((prev) =>
-                    prev.includes(container.id)
-                      ? prev.filter((id) => id !== container.id)
-                      : [...prev, container.id]
-                  )
-                }}
-              >
-                {container.name}
-                <span className="ml-1 text-xs opacity-70">
-                  ({container.logs.length})
-                </span>
-              </Badge>
-            ))}
-          </div>
+          {adminLogs.length === 0 ? (
+            <p className="text-muted-foreground text-center py-4">
+              暂无日志，请点击上方"添加日志"按钮创建
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {adminLogs.map((log) => (
+                <Badge
+                  key={log.id}
+                  variant={selectedLogs.includes(log.id) ? 'default' : 'outline'}
+                  className="cursor-pointer px-3 py-1"
+                  onClick={() => {
+                    setSelectedLogs(prev =>
+                      prev.includes(log.id)
+                        ? prev.filter(id => id !== log.id)
+                        : [...prev, log.id]
+                    )
+                  }}
+                >
+                  {log.name}
+                </Badge>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* 日志容器 */}
+      {/* 日志查看器 */}
       <div className={`grid gap-4 ${getGridCols()}`}>
-        {visibleContainers.map((container) => (
-          <Card key={container.id} className="flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {container.name}
-              </CardTitle>
-              <div className="flex items-center gap-1">
-                <Badge variant="outline" className="text-xs">
-                  {container.service.toUpperCase()}
-                </Badge>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={() => handleClearLogs(container.id)}
-                >
-                  <Trash2 className="h-3 w-3" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="flex-1 p-0">
-              <ScrollArea className="h-[300px] w-full">
-                <div
-                  ref={(el) => {
-                    scrollRefs.current[container.id] = el
-                  }}
-                  className="log-container p-4 font-mono text-xs"
-                >
-                  {container.logs.length > 0 ? (
-                    container.logs.map((log, index) => (
-                      <pre
-                        key={index}
-                        className="text-muted-foreground hover:bg-muted/50 py-0.5"
-                      >
-                        {log}
-                      </pre>
-                    ))
-                  ) : (
-                    <p className="text-center text-muted-foreground py-8">
-                      暂无日志
-                    </p>
-                  )}
+        {visibleLogs.map((log) => {
+          const state = logViewerStates.get(log.id)
+          if (!state) return null
+
+          return (
+            <Card 
+              key={log.id} 
+              className={`flex flex-col ${state.isFullscreen ? 'fixed inset-4 z-50 m-0' : ''}`}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  {log.name}
+                  <span className="text-xs text-muted-foreground font-normal">
+                    {new Date(log.created_at).toLocaleString()}
+                  </span>
+                </CardTitle>
+                <div className="flex items-center gap-1">
+                  {/* 刷新间隔选择 */}
+                  <Select
+                    value={String(state.refreshInterval)}
+                    onValueChange={(value) => setRefreshInterval(log.id, Number(value))}
+                  >
+                    <SelectTrigger className="h-7 w-16 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1s</SelectItem>
+                      <SelectItem value="3">3s</SelectItem>
+                      <SelectItem value="5">5s</SelectItem>
+                      <SelectItem value="10">10s</SelectItem>
+                      <SelectItem value="30">30s</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  {/* 自动刷新开关 */}
+                  <Button
+                    variant={state.isAutoRefresh ? 'default' : 'outline'}
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => toggleAutoRefresh(log.id)}
+                    title={state.isAutoRefresh ? '停止自动刷新' : '开始自动刷新'}
+                  >
+                    {state.isAutoRefresh ? (
+                      <Pause className="h-3 w-3" />
+                    ) : (
+                      <Play className="h-3 w-3" />
+                    )}
+                  </Button>
+                  
+                  {/* 手动刷新 */}
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => handleRefresh(log.id)}
+                    title="手动刷新"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                  </Button>
+                  
+                  {/* 在新窗口打开 */}
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => window.open(log.address, '_blank')}
+                    title="在新窗口打开"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                  </Button>
+                  
+                  {/* 全屏切换 */}
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => toggleFullscreen(log.id)}
+                    title={state.isFullscreen ? '退出全屏' : '全屏'}
+                  >
+                    {state.isFullscreen ? (
+                      <Minimize2 className="h-3 w-3" />
+                    ) : (
+                      <Maximize2 className="h-3 w-3" />
+                    )}
+                  </Button>
+                  
+                  {/* 编辑 */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => startEdit(log)}
+                    title="编辑"
+                  >
+                    <Edit className="h-3 w-3" />
+                  </Button>
+                  
+                  {/* 删除 */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-destructive hover:text-destructive"
+                    onClick={() => handleDelete(log.id)}
+                    title="删除"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
                 </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-        ))}
+              </CardHeader>
+              <CardContent className="flex-1 p-0">
+                <div className={`relative ${state.isFullscreen ? 'h-[calc(100vh-120px)]' : 'h-[400px]'}`}>
+                  {/* 自动刷新指示器 */}
+                  {state.isAutoRefresh && (
+                    <div className="absolute top-2 right-2 z-10">
+                      <Badge variant="secondary" className="text-xs">
+                        <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse mr-1" />
+                        每 {state.refreshInterval}s 刷新
+                      </Badge>
+                    </div>
+                  )}
+                  
+                  <iframe
+                    key={state.iframeKey}
+                    src={log.address}
+                    className="w-full h-full border-0 bg-background"
+                    title={log.name}
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
 
+      {/* 空状态 */}
+      {visibleLogs.length === 0 && adminLogs.length > 0 && (
+        <Card>
+          <CardContent className="py-8">
+            <p className="text-center text-muted-foreground">
+              请在上方选择要查看的日志
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* 状态指示 */}
-      <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
-        <span className="flex items-center gap-2">
-          <span
-            className={`h-2 w-2 rounded-full ${
-              isPaused ? 'bg-yellow-500' : 'bg-green-500 animate-pulse'
-            }`}
-          />
-          {isPaused ? '已暂停' : '实时更新中'}
-        </span>
-        <span>|</span>
-        <span>显示 {selectedContainers.length} 个容器</span>
-      </div>
+      {adminLogs.length > 0 && (
+        <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+          <span>共 {adminLogs.length} 个日志</span>
+          <span>|</span>
+          <span>显示 {selectedLogs.length} 个</span>
+          {Array.from(logViewerStates.values()).some(s => s.isAutoRefresh) && (
+            <>
+              <span>|</span>
+              <span className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                自动刷新中
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* 错误提示 */}
+      {error && (
+        <div className="fixed bottom-4 right-4 bg-destructive text-destructive-foreground px-4 py-2 rounded-md shadow-lg">
+          {error}
+        </div>
+      )}
     </div>
   )
 }

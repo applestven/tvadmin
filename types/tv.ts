@@ -42,3 +42,21 @@ export interface TvTaskQueryRequest {
     page?: number
     limit?: number
 }
+
+// 管理员日志类型定义
+export interface AdminLog {
+    id: string
+    name: string
+    address: string
+    created_at: string
+}
+
+export interface CreateAdminLogDto {
+    name: string
+    address: string
+}
+
+export interface UpdateAdminLogDto {
+    name?: string
+    address?: string
+}
