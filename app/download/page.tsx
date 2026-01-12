@@ -125,24 +125,24 @@ export default function DownloadPage() {
                 />
               </div>
             </div>
-            <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value)}>
+            <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value === 'all' ? '' : value)}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="任务状态" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部状态</SelectItem>
+                <SelectItem value="all">全部状态</SelectItem>
                 <SelectItem value="pending">等待中</SelectItem>
                 <SelectItem value="running">运行中</SelectItem>
                 <SelectItem value="success">成功</SelectItem>
                 <SelectItem value="failed">失败</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={filters.quality} onValueChange={(value) => handleFilterChange('quality', value)}>
+            <Select value={filters.quality} onValueChange={(value) => handleFilterChange('quality', value === 'all' ? '' : value)}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="视频质量" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部质量</SelectItem>
+                <SelectItem value="all">全部质量</SelectItem>
                 <SelectItem value="video_best">最佳视频</SelectItem>
                 <SelectItem value="audio_best">最佳音频</SelectItem>
                 <SelectItem value="video_worst">最低视频</SelectItem>

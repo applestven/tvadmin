@@ -185,12 +185,12 @@ export default function TranscodePage() {
                 />
               </div>
             </div>
-            <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value)}>
+            <Select value={filters.status || 'all'} onValueChange={(value) => handleFilterChange('status', value === 'all' ? '' : value)}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="任务状态" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部状态</SelectItem>
+                <SelectItem value="all">全部状态</SelectItem>
                 <SelectItem value="pending">等待中</SelectItem>
                 <SelectItem value="queued">排队中</SelectItem>
                 <SelectItem value="running">运行中</SelectItem>
@@ -198,12 +198,12 @@ export default function TranscodePage() {
                 <SelectItem value="failed">失败</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={filters.quality} onValueChange={(value) => handleFilterChange('quality', value)}>
+            <Select value={filters.quality || 'all'} onValueChange={(value) => handleFilterChange('quality', value === 'all' ? '' : value)}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="模型质量" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部质量</SelectItem>
+                <SelectItem value="all">全部质量</SelectItem>
                 <SelectItem value="tiny">Tiny</SelectItem>
                 <SelectItem value="base">Base</SelectItem>
                 <SelectItem value="small">Small</SelectItem>
