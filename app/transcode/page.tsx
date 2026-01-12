@@ -22,9 +22,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { CopyableText } from '@/components/ui/copyable-text'
+import { CreateTranscodeTaskDialog, ErrorDetailDialog } from '@/components/dialogs'
 import { useDvApi } from '@/hooks'
-import { getStatusColor, getStatusText, formatDate, truncateString } from '@/lib/utils'
-import { RefreshCw, Search, Eye, Plus, Trash2 } from 'lucide-react'
+import { getStatusColor, getStatusText, formatDate } from '@/lib/utils'
+import { RefreshCw, Search, Eye, Trash2 } from 'lucide-react'
 import type { DvTask, DvQueueStatus } from '@/types'
 
 export default function TranscodePage() {
@@ -39,7 +41,7 @@ export default function TranscodePage() {
     search: '',
   })
 
-  const { getTasks, getQueueStatus, cancelTask, manualCleanup } = useDvApi()
+  const { getTasks, getQueueStatus, cancelTask, manualCleanup, createTask } = useDvApi()
   const pageSize = 10
 
   const fetchTasks = useCallback(async () => {
@@ -116,6 +118,12 @@ export default function TranscodePage() {
     }
   }
 
+  const handleCreateTask = async (url: string, quality: string, language: string) => {
+    await createTask(url, quality, language)
+    // 创建成功后刷新列表
+    fetchTasks()
+  }
+
   const totalPages = Math.ceil(total / pageSize)
 
   return (
@@ -133,10 +141,7 @@ export default function TranscodePage() {
           <Button variant="outline" size="icon" onClick={handleRefresh} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            新建任务
-          </Button>
+          <CreateTranscodeTaskDialog onSubmit={handleCreateTask} loading={loading} />
         </div>
       </div>
 
@@ -226,78 +231,115 @@ export default function TranscodePage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[100px]">ID</TableHead>
-                <TableHead>URL</TableHead>
-                <TableHead className="w-[100px]">模型</TableHead>
-                <TableHead className="w-[100px]">状态</TableHead>
-                <TableHead className="w-[120px]">进度</TableHead>
-                <TableHead className="w-[180px]">创建时间</TableHead>
-                <TableHead className="w-[120px]">操作</TableHead>
+                <TableHead className="w-[180px]">URL</TableHead>
+                <TableHead className="w-[150px]">文件名</TableHead>
+                <TableHead className="w-[80px]">模型</TableHead>
+                <TableHead className="w-[80px]">状态</TableHead>
+                <TableHead className="w-[100px]">进度</TableHead>
+                <TableHead className="w-[150px]">错误信息</TableHead>
+                <TableHead className="w-[160px]">创建时间</TableHead>
+                <TableHead className="w-[100px]">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 [...Array(5)].map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={9}>
                       <div className="h-10 animate-pulse rounded bg-muted" />
                     </TableCell>
                   </TableRow>
                 ))
               ) : tasks.length > 0 ? (
-                tasks.map((task) => (
-                  <TableRow key={task.id}>
-                    <TableCell className="font-mono text-xs">
-                      {truncateString(task.id, 8)}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm" title={task.url}>
-                        {truncateString(task.url, 40)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{task.quality}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(task.status)}>
-                        {getStatusText(task.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {task.status === 'running' && task.progress !== undefined ? (
-                        <div className="space-y-1">
-                          <Progress value={task.progress} className="h-2" />
-                          <span className="text-xs text-muted-foreground">{task.progress}%</span>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {task.createdAt ? formatDate(task.createdAt) : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Link href={`/transcode/${task.id}`}>
-                          <Button variant="ghost" size="icon">
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        {(task.status === 'pending' || task.status === 'queued') && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleCancel(task.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                tasks.map((task) => {
+                  // 从 URL 中提取文件名
+                  const getFileNameFromUrl = (url: string) => {
+                    try {
+                      const urlObj = new URL(url)
+                      const pathname = urlObj.pathname
+                      const fileName = pathname.split('/').pop() || ''
+                      return decodeURIComponent(fileName)
+                    } catch {
+                      return ''
+                    }
+                  }
+                  const fileName = getFileNameFromUrl(task.url)
+                  
+                  return (
+                    <TableRow key={task.id}>
+                      <TableCell className="font-mono text-xs relative">
+                        <CopyableText text={task.id} maxLength={8} />
+                      </TableCell>
+                      <TableCell className="relative">
+                        <CopyableText 
+                          text={task.url} 
+                          maxLength={25} 
+                          className="text-sm"
+                        />
+                      </TableCell>
+                      <TableCell className="relative">
+                        {fileName ? (
+                          <CopyableText 
+                            text={fileName} 
+                            maxLength={20} 
+                            className="text-sm"
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
                         )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{task.quality}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(task.status)}>
+                          {getStatusText(task.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {task.status === 'running' && task.progress !== undefined ? (
+                          <div className="space-y-1">
+                            <Progress value={task.progress} className="h-2" />
+                            <span className="text-xs text-muted-foreground">{task.progress}%</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {task.status === 'failed' && task.error ? (
+                          <ErrorDetailDialog error={task.error} taskId={task.id} />
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {task.createdAt ? formatDate(task.createdAt) : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Link href={`/transcode/${task.id}`}>
+                            <Button variant="ghost" size="icon">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                          {(task.status === 'pending' || task.status === 'queued') && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleCancel(task.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     暂无任务数据
                   </TableCell>
                 </TableRow>

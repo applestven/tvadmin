@@ -39,6 +39,11 @@ export interface CreateAdminLogDto {
     address: string
 }
 
+export interface UpdateAdminLogDto {
+    name?: string
+    address?: string
+}
+
 export interface FileInfo {
     name: string
     size: number

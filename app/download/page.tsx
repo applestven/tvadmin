@@ -21,9 +21,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { CopyableText } from '@/components/ui/copyable-text'
+import { CreateDownloadTaskDialog, ErrorDetailDialog } from '@/components/dialogs'
 import { useTvApi } from '@/hooks'
-import { getStatusColor, getStatusText, formatDate, truncateString } from '@/lib/utils'
-import { RefreshCw, Search, Eye, Plus } from 'lucide-react'
+import { getStatusColor, getStatusText, formatDate } from '@/lib/utils'
+import { RefreshCw, Search, Eye } from 'lucide-react'
 import type { TvTask, VideoQuality, TvTaskStatus } from '@/types'
 
 export default function DownloadPage() {
@@ -37,7 +39,7 @@ export default function DownloadPage() {
     search: '',
   })
 
-  const { getTasks } = useTvApi()
+  const { getTasks, createTask } = useTvApi()
   const pageSize = 10
 
   const fetchTasks = useCallback(async () => {
@@ -86,6 +88,12 @@ export default function DownloadPage() {
     setPage(1)
   }
 
+  const handleCreateTask = async (url: string, quality: string) => {
+    await createTask(url, quality)
+    // 创建成功后刷新列表
+    fetchTasks()
+  }
+
   const totalPages = Math.ceil(total / pageSize)
 
   return (
@@ -99,10 +107,7 @@ export default function DownloadPage() {
           <Button variant="outline" size="icon" onClick={handleRefresh} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            新建任务
-          </Button>
+          <CreateDownloadTaskDialog onSubmit={handleCreateTask} loading={loading} />
         </div>
       </div>
 
@@ -164,56 +169,97 @@ export default function DownloadPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-[100px]">ID</TableHead>
-                <TableHead>URL</TableHead>
-                <TableHead className="w-[100px]">质量</TableHead>
-                <TableHead className="w-[100px]">状态</TableHead>
-                <TableHead className="w-[180px]">创建时间</TableHead>
-                <TableHead className="w-[100px]">操作</TableHead>
+                <TableHead className="w-[180px]">URL</TableHead>
+                <TableHead className="w-[150px]">文件名</TableHead>
+                <TableHead className="w-[180px]">访问地址</TableHead>
+                <TableHead className="w-[80px]">质量</TableHead>
+                <TableHead className="w-[80px]">状态</TableHead>
+                <TableHead className="w-[150px]">错误信息</TableHead>
+                <TableHead className="w-[160px]">创建时间</TableHead>
+                <TableHead className="w-[80px]">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 [...Array(5)].map((_, i) => (
                   <TableRow key={i}>
-                    <TableCell colSpan={6}>
+                    <TableCell colSpan={9}>
                       <div className="h-10 animate-pulse rounded bg-muted" />
                     </TableCell>
                   </TableRow>
                 ))
               ) : tasks.length > 0 ? (
-                tasks.map((task) => (
-                  <TableRow key={task.id}>
-                    <TableCell className="font-mono text-xs">
-                      {truncateString(task.id, 8)}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm" title={task.url}>
-                        {truncateString(task.url, 50)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{task.quality}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(task.status)}>
-                        {getStatusText(task.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {task.createdAt ? formatDate(task.createdAt) : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Link href={`/download/${task.id}`}>
-                        <Button variant="ghost" size="icon">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))
+                tasks.map((task) => {
+                  // 拼接访问地址
+                  const accessUrl = task.location && task.outputName 
+                    ? `${task.location}:3456/downloads/${task.outputName}`
+                    : null
+                  
+                  return (
+                    <TableRow key={task.id}>
+                      <TableCell className="font-mono text-xs relative">
+                        <CopyableText text={task.id} maxLength={8} />
+                      </TableCell>
+                      <TableCell className="relative">
+                        <CopyableText 
+                          text={task.url} 
+                          maxLength={25} 
+                          className="text-sm"
+                        />
+                      </TableCell>
+                      <TableCell className="relative">
+                        {task.outputName ? (
+                          <CopyableText 
+                            text={task.outputName} 
+                            maxLength={20} 
+                            className="text-sm"
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="relative">
+                        {accessUrl ? (
+                          <CopyableText 
+                            text={accessUrl} 
+                            maxLength={25} 
+                            className="text-sm"
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{task.quality}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(task.status)}>
+                          {getStatusText(task.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {task.status === 'failed' && task.error ? (
+                          <ErrorDetailDialog error={task.error} taskId={task.id} />
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {task.createdAt ? formatDate(task.createdAt) : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Link href={`/download/${task.id}`}>
+                          <Button variant="ghost" size="icon">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     暂无任务数据
                   </TableCell>
                 </TableRow>

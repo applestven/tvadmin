@@ -31,8 +31,9 @@ export function useTvApi() {
         setError(null)
 
         try {
-            const response = await apiGet<ApiResponse<TvTask>>(`/api/dv/task/${id}`)
-            return response.data
+            // 接口直接返回 TvTask 对象
+            const response = await apiGet<TvTask>(`/api/dv/task/${id}`)
+            return response
         } catch (err) {
             const message = err instanceof Error ? err.message : '获取任务详情失败'
             setError(message)

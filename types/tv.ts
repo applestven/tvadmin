@@ -1,12 +1,12 @@
 // TV 任务类型定义
 export type TvTaskStatus = 'pending' | 'running' | 'success' | 'failed'
 
-export type VideoQuality = 'video_best' | 'audio_best' | 'video_worst' | 'audio_worst'
+export type VideoQuality = 'video_best' | 'audio_best' | 'video_worst' | 'audio_worst' | 'audio_low' | 'video_low'
 
 export interface TvTask {
     id: string
     url: string
-    quality: VideoQuality
+    quality: VideoQuality | string
     status: TvTaskStatus
     location?: string
     createdAt: number
@@ -15,7 +15,8 @@ export interface TvTask {
     strategy?: string
     output?: string
     outputName?: string
-    error?: string
+    fullPath?: string  // 完整的下载文件访问地址
+    error?: string | null
 }
 
 export interface TvTaskStats {
@@ -41,22 +42,4 @@ export interface TvTaskQueryRequest {
     filters?: TvTaskQueryFilters
     page?: number
     limit?: number
-}
-
-// 管理员日志类型定义
-export interface AdminLog {
-    id: string
-    name: string
-    address: string
-    created_at: string
-}
-
-export interface CreateAdminLogDto {
-    name: string
-    address: string
-}
-
-export interface UpdateAdminLogDto {
-    name?: string
-    address?: string
 }

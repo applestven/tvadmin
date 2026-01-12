@@ -328,7 +328,7 @@ export default function LogsPage() {
         <CardContent>
           {adminLogs.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">
-              暂无日志，请点击上方"添加日志"按钮创建
+              暂无日志，请点击上方&ldquo;添加日志&rdquo;按钮创建
             </p>
           ) : (
             <div className="flex flex-wrap gap-2">
