@@ -24,7 +24,7 @@ import {
 import { CopyableText } from '@/components/ui/copyable-text'
 import { CreateDownloadTaskDialog, ErrorDetailDialog } from '@/components/dialogs'
 import { useTvApi } from '@/hooks'
-import { getStatusColor, getStatusText, formatDate } from '@/lib/utils'
+import { getStatusColor, getStatusText, formatDate, getProcessingTime } from '@/lib/utils'
 import { RefreshCw, Search, Eye } from 'lucide-react'
 import type { TvTask, VideoQuality, TvTaskStatus } from '@/types'
 
@@ -175,6 +175,7 @@ export default function DownloadPage() {
                 <TableHead className="w-[80px]">质量</TableHead>
                 <TableHead className="w-[80px]">状态</TableHead>
                 <TableHead className="w-[150px]">错误信息</TableHead>
+                <TableHead className="w-[120px]">处理时间</TableHead>
                 <TableHead className="w-[160px]">创建时间</TableHead>
                 <TableHead className="w-[80px]">操作</TableHead>
               </TableRow>
@@ -240,6 +241,13 @@ export default function DownloadPage() {
                       <TableCell>
                         {task.status === 'failed' && task.error ? (
                           <ErrorDetailDialog error={task.error} taskId={task.id} />
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {task.status === 'success' ? (
+                          getProcessingTime(task.startedAt, task.finishedAt)
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}

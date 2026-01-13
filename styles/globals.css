@@ -90,3 +90,45 @@
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+/* 日志 iframe 隐藏竖向滚动条，美化横向滚动条 */
+.log-iframe-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+
+.log-iframe-wrapper iframe {
+  width: calc(100% + 17px); /* 增加宽度以隐藏右侧竖向滚动条 */
+  height: 100%;
+  border: 0;
+}
+
+/* 横向滚动条美化 - 进度条样式 */
+.log-iframe-wrapper::-webkit-scrollbar {
+  height: 6px;
+  width: 0; /* 隐藏竖向 */
+}
+
+.log-iframe-wrapper::-webkit-scrollbar:horizontal {
+  height: 6px;
+}
+
+.log-iframe-wrapper::-webkit-scrollbar-track:horizontal {
+  background: hsl(var(--muted));
+  border-radius: 3px;
+}
+
+.log-iframe-wrapper::-webkit-scrollbar-thumb:horizontal {
+  background: linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.7) 100%);
+  border-radius: 3px;
+}
+
+.log-iframe-wrapper::-webkit-scrollbar-thumb:horizontal:hover {
+  background: linear-gradient(90deg, hsl(var(--primary)) 0%, hsl(var(--primary) / 0.9) 100%);
+}
+
+/* Firefox 横向滚动条 */
+.log-iframe-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary)) hsl(var(--muted));
+}

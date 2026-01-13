@@ -25,7 +25,7 @@ import {
 import { CopyableText } from '@/components/ui/copyable-text'
 import { CreateTranscodeTaskDialog, ErrorDetailDialog } from '@/components/dialogs'
 import { useDvApi } from '@/hooks'
-import { getStatusColor, getStatusText, formatDate } from '@/lib/utils'
+import { getStatusColor, getStatusText, formatDate, getProcessingTime } from '@/lib/utils'
 import { RefreshCw, Search, Eye, Trash2 } from 'lucide-react'
 import type { DvTask, DvQueueStatus } from '@/types'
 
@@ -237,6 +237,7 @@ export default function TranscodePage() {
                 <TableHead className="w-[80px]">状态</TableHead>
                 <TableHead className="w-[100px]">进度</TableHead>
                 <TableHead className="w-[150px]">错误信息</TableHead>
+                <TableHead className="w-[120px]">处理时间</TableHead>
                 <TableHead className="w-[160px]">创建时间</TableHead>
                 <TableHead className="w-[100px]">操作</TableHead>
               </TableRow>
@@ -309,6 +310,13 @@ export default function TranscodePage() {
                       <TableCell>
                         {task.status === 'failed' && task.error ? (
                           <ErrorDetailDialog error={task.error} taskId={task.id} />
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {task.status === 'success' ? (
+                          getProcessingTime(task.started_at ?? task.startedAt, task.finished_at ?? task.finishedAt)
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}

@@ -11,11 +11,15 @@ export interface DvTask {
     location?: string
     languageArray?: string
     createdAt?: number
+    created_at?: string
     startedAt?: number
+    started_at?: string
     finishedAt?: number
+    finished_at?: string
     progress?: number
     output?: string
-    error?: string
+    output_name?: string
+    error?: string | null
 }
 
 export interface DvTaskStats {

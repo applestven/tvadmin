@@ -17,17 +17,33 @@ export function formatDate(timestamp: number): string {
 }
 
 export function formatDuration(ms: number): string {
-    const seconds = Math.floor(ms / 1000)
-    const minutes = Math.floor(seconds / 60)
-    const hours = Math.floor(minutes / 60)
+    if (typeof ms !== 'number' || isNaN(ms) || ms < 0) return '-'
 
-    if (hours > 0) {
-        return `${hours}小时${minutes % 60}分钟`
-    }
-    if (minutes > 0) {
-        return `${minutes}分钟${seconds % 60}秒`
-    }
-    return `${seconds}秒`
+    const totalSeconds = Math.floor(ms / 1000)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+
+    const pad = (n: number) => n.toString().padStart(2, '0')
+    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+}
+
+// 解析时间戳，支持字符串或数字
+export function parseTimestamp(value: string | number | undefined | null): number | null {
+    if (value === undefined || value === null) return null
+    const num = typeof value === 'string' ? parseInt(value, 10) : value
+    return isNaN(num) ? null : num
+}
+
+// 计算处理时间（结束时间 - 开始时间），返回格式化的时分秒
+export function getProcessingTime(
+    startedAt: string | number | undefined | null,
+    finishedAt: string | number | undefined | null
+): string {
+    const start = parseTimestamp(startedAt)
+    const end = parseTimestamp(finishedAt)
+    if (start === null || end === null) return '-'
+    return formatDuration(end - start)
 }
 
 export function truncateString(str: string, maxLength: number): string {
