@@ -26,7 +26,7 @@ import { CopyableText } from '@/components/ui/copyable-text'
 import { CreateTranscodeTaskDialog, ErrorDetailDialog } from '@/components/dialogs'
 import { useDvApi } from '@/hooks'
 import { getStatusColor, getStatusText, formatDate, getProcessingTime } from '@/lib/utils'
-import { RefreshCw, Search, Eye, Trash2 } from 'lucide-react'
+import { RefreshCw, Search, Eye, Trash2, RotateCcw } from 'lucide-react'
 import type { DvTask, DvQueueStatus } from '@/types'
 
 export default function TranscodePage() {
@@ -41,7 +41,7 @@ export default function TranscodePage() {
     search: '',
   })
 
-  const { getTasks, getQueueStatus, cancelTask, manualCleanup, createTask } = useDvApi()
+  const { getTasks, getQueueStatus, cancelTask, manualCleanup, createTask, retryTask } = useDvApi()
   const pageSize = 10
 
   const fetchTasks = useCallback(async () => {
@@ -122,6 +122,15 @@ export default function TranscodePage() {
     await createTask(url, quality, language)
     // 创建成功后刷新列表
     fetchTasks()
+  }
+
+  const handleRetry = async (task: DvTask) => {
+    try {
+      await retryTask(task.url, task.quality, task.languageArray || 'zh')
+      fetchTasks()
+    } catch (error) {
+      console.error('Failed to retry task:', error)
+    }
   }
 
   const totalPages = Math.ceil(total / pageSize)
@@ -331,6 +340,16 @@ export default function TranscodePage() {
                               <Eye className="h-4 w-4" />
                             </Button>
                           </Link>
+                          {task.status === 'failed' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRetry(task)}
+                              title="重试"
+                            >
+                              <RotateCcw className="h-4 w-4 text-orange-500" />
+                            </Button>
+                          )}
                           {(task.status === 'pending' || task.status === 'queued') && (
                             <Button
                               variant="ghost"
@@ -356,8 +375,21 @@ export default function TranscodePage() {
           </Table>
 
           {/* 分页 */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-end space-x-2 pt-4">
+          <div className="flex items-center justify-between pt-4 border-t">
+            <div className="text-sm text-muted-foreground">
+              共 <span className="font-medium text-foreground">{total}</span> 条记录，
+              每页 <span className="font-medium text-foreground">{pageSize}</span> 条，
+              共 <span className="font-medium text-foreground">{totalPages}</span> 页
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(1)}
+                disabled={page === 1}
+              >
+                首页
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -366,19 +398,27 @@ export default function TranscodePage() {
               >
                 上一页
               </Button>
-              <span className="text-sm text-muted-foreground">
-                第 {page} / {totalPages} 页
+              <span className="text-sm text-muted-foreground px-2">
+                第 <span className="font-medium text-foreground">{page}</span> / {totalPages} 页
               </span>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
+                disabled={page === totalPages || totalPages === 0}
               >
                 下一页
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(totalPages)}
+                disabled={page === totalPages || totalPages === 0}
+              >
+                末页
+              </Button>
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
     </div>

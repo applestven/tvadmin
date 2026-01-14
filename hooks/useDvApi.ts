@@ -23,7 +23,14 @@ export function useDvApi() {
 
         try {
             const response = await apiGet<PaginatedResponse<DvTask>>('/api/tv/tts/tasks', params)
-            return response
+            // TV 转译接口返回 { data, pagination: { page, pageSize, total, totalPages } }
+            // 转换为统一格式
+            return {
+                data: response.data,
+                total: response.pagination?.total || response.total || 0,
+                page: response.pagination?.page || response.page || 1,
+                pageSize: response.pagination?.pageSize || response.pageSize || 10,
+            }
         } catch (err) {
             const message = err instanceof Error ? err.message : '获取任务列表失败'
             setError(message)
@@ -122,30 +129,40 @@ export function useDvApi() {
         }
     }, [])
 
-    // 获取统计数据
+    // 获取统计数据 (TV /tts/stats 接口)
     const getStats = useCallback(async (): Promise<DvTaskStats> => {
-        // 通过获取各状态的任务来计算统计
-        const stats: DvTaskStats = {
-            total: 0,
-            pending: 0,
-            queued: 0,
-            running: 0,
-            success: 0,
-            failed: 0,
-        }
+        setLoading(true)
+        setError(null)
 
         try {
-            const queueStatus = await getQueueStatus()
-            if (queueStatus) {
-                stats.running = queueStatus.runningTasks
-                stats.queued = queueStatus.queueLength
-            }
-        } catch {
-            // 忽略错误
-        }
+            const response = await apiGet<ApiResponse<DvTaskStats>>('/api/tv/tts/stats')
 
-        return stats
-    }, [getQueueStatus])
+            const stats: DvTaskStats = {
+                total: response.data?.total || 0,
+                pending: response.data?.pending || 0,
+                queued: response.data?.queued || 0,
+                running: response.data?.running || 0,
+                success: response.data?.success || 0,
+                failed: response.data?.failed || 0,
+            }
+
+            return stats
+        } catch (err) {
+            const message = err instanceof Error ? err.message : '获取统计数据失败'
+            setError(message)
+            // 返回空统计
+            return {
+                total: 0,
+                pending: 0,
+                queued: 0,
+                running: 0,
+                success: 0,
+                failed: 0,
+            }
+        } finally {
+            setLoading(false)
+        }
+    }, [])
 
     // 手动清理
     const manualCleanup = useCallback(async () => {
@@ -164,12 +181,18 @@ export function useDvApi() {
         }
     }, [])
 
+    // 重试任务（使用原任务的 URL 和 quality 重新创建）
+    const retryTask = useCallback(async (url: string, quality: string, languageArray: string = 'zh') => {
+        return createTask(url, quality, languageArray)
+    }, [createTask])
+
     return {
         loading,
         error,
         getTasks,
         getTaskDetail,
         createTask,
+        retryTask,
         cancelTask,
         getQueueStatus,
         getModels,

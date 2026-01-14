@@ -8,14 +8,21 @@ export function useTvApi() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
-    // 获取任务列表
+    // 获取任务列表 (DV 下载任务)
     const getTasks = useCallback(async (params?: TvTaskQueryRequest) => {
         setLoading(true)
         setError(null)
 
         try {
             const response = await apiPost<PaginatedResponse<TvTask>>('/api/dv/tasks/query', params)
-            return response
+            // DV 下载接口返回 { code, data, pagination: { page, pageSize, total, totalPages }, message }
+            // 转换为统一格式
+            return {
+                data: response.data,
+                total: response.pagination?.total || response.total || response.data?.length || 0,
+                page: response.pagination?.page || response.page || 1,
+                pageSize: response.pagination?.pageSize || response.pageSize || 10,
+            }
         } catch (err) {
             const message = err instanceof Error ? err.message : '获取任务列表失败'
             setError(message)
@@ -63,32 +70,43 @@ export function useTvApi() {
         }
     }, [])
 
-    // 获取统计数据
-    const getStats = useCallback(async () => {
+    // 获取统计数据 (DV /stats 接口)
+    const getStats = useCallback(async (): Promise<TvTaskStats> => {
         setLoading(true)
         setError(null)
 
         try {
-            // 获取各状态的任务数量
-            const response = await apiGet<ApiResponse<{ runningTasks: TvTask[]; total: number }>>('/api/dv/c')
+            const response = await apiGet<ApiResponse<{ total: number; downloading: number; failed: number }>>('/api/dv/stats')
 
             const stats: TvTaskStats = {
                 total: response.data?.total || 0,
                 pending: 0,
-                running: response.data?.runningTasks?.length || 0,
-                success: 0,
-                failed: 0,
+                running: response.data?.downloading || 0,
+                success: (response.data?.total || 0) - (response.data?.downloading || 0) - (response.data?.failed || 0),
+                failed: response.data?.failed || 0,
             }
 
             return stats
         } catch (err) {
             const message = err instanceof Error ? err.message : '获取统计数据失败'
             setError(message)
-            throw err
+            // 返回空统计
+            return {
+                total: 0,
+                pending: 0,
+                running: 0,
+                success: 0,
+                failed: 0,
+            }
         } finally {
             setLoading(false)
         }
     }, [])
+
+    // 重试任务（使用原任务的 URL 和 quality 重新创建）
+    const retryTask = useCallback(async (url: string, quality: string) => {
+        return createTask(url, quality)
+    }, [createTask])
 
     return {
         loading,
@@ -96,6 +114,7 @@ export function useTvApi() {
         getTasks,
         getTaskDetail,
         createTask,
+        retryTask,
         getStats,
     }
 }

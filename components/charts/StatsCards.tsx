@@ -11,19 +11,21 @@ interface StatsCardsProps {
 }
 
 export function StatsCards({ tvStats, dvStats, loading }: StatsCardsProps) {
+  // tvStats = 下载任务统计 (DV 服务)
+  // dvStats = 转译任务统计 (TV 服务)
   const cards = [
     {
-      title: 'TV 下载任务',
+      title: '下载任务',
       value: tvStats?.total ?? 0,
-      description: '总任务数',
+      description: 'DV 视频下载',
       icon: Download,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
     },
     {
-      title: 'DV 转译任务',
+      title: '转译任务',
       value: dvStats?.total ?? 0,
-      description: '总任务数',
+      description: 'TV 语音转文字',
       icon: FileAudio,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100',

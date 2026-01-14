@@ -10,36 +10,39 @@ import { getStatusColor, getStatusText, formatDate } from '@/lib/utils'
 import type { TvTask, DvTask, TvTaskStats, DvTaskStats } from '@/types'
 
 export default function DashboardPage() {
-  const [tvStats, setTvStats] = useState<TvTaskStats | null>(null)
-  const [dvStats, setDvStats] = useState<DvTaskStats | null>(null)
-  const [recentTvTasks, setRecentTvTasks] = useState<TvTask[]>([])
-  const [recentDvTasks, setRecentDvTasks] = useState<DvTask[]>([])
+  // tvStats 实际是下载任务统计 (DV 服务)
+  // dvStats 实际是转译任务统计 (TV 服务)
+  const [downloadStats, setDownloadStats] = useState<TvTaskStats | null>(null)
+  const [transcodeStats, setTranscodeStats] = useState<DvTaskStats | null>(null)
+  const [recentDownloadTasks, setRecentDownloadTasks] = useState<TvTask[]>([])
+  const [recentTranscodeTasks, setRecentTranscodeTasks] = useState<DvTask[]>([])
   const [loading, setLoading] = useState(true)
 
-  const tvApi = useTvApi()
-  const dvApi = useDvApi()
+  const downloadApi = useTvApi()  // DV 服务 - 下载
+  const transcodeApi = useDvApi() // TV 服务 - 转译
 
   const fetchData = async () => {
     setLoading(true)
     try {
-      // 获取 TV 任务
-      const tvTasksResponse = await tvApi.getTasks({ page: 1, limit: 5 })
-      if (tvTasksResponse?.data) {
-        setRecentTvTasks(tvTasksResponse.data)
+      // 获取下载任务 (DV)
+      const downloadTasksResponse = await downloadApi.getTasks({ page: 1, limit: 5 })
+      if (downloadTasksResponse?.data) {
+        setRecentDownloadTasks(downloadTasksResponse.data)
       }
 
-      // 获取 DV 任务
-      const dvTasksResponse = await dvApi.getTasks({ page: 1, pageSize: 5 })
-      if (dvTasksResponse?.data) {
-        setRecentDvTasks(dvTasksResponse.data)
+      // 获取转译任务 (TV)
+      const transcodeTasksResponse = await transcodeApi.getTasks({ page: 1, pageSize: 5 })
+      if (transcodeTasksResponse?.data) {
+        setRecentTranscodeTasks(transcodeTasksResponse.data)
       }
 
-      // 获取统计
-      const tvStatsData = await tvApi.getStats()
-      setTvStats(tvStatsData)
+      // 获取下载统计 (DV /stats)
+      const downloadStatsData = await downloadApi.getStats()
+      setDownloadStats(downloadStatsData)
 
-      const dvStatsData = await dvApi.getStats()
-      setDvStats(dvStatsData)
+      // 获取转译统计 (TV /tts/stats)
+      const transcodeStatsData = await transcodeApi.getStats()
+      setTranscodeStats(transcodeStatsData)
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error)
     } finally {
@@ -65,21 +68,21 @@ export default function DashboardPage() {
       </div>
 
       {/* 统计卡片 */}
-      <StatsCards tvStats={tvStats} dvStats={dvStats} loading={loading} />
+      <StatsCards tvStats={downloadStats} dvStats={transcodeStats} loading={loading} />
 
       {/* 图表区域 */}
       <div className="grid gap-6 md:grid-cols-2">
-        <TrafficChart tvStats={tvStats} dvStats={dvStats} title="TV 任务分布" type="tv" />
-        <TrafficChart tvStats={tvStats} dvStats={dvStats} title="DV 任务分布" type="dv" />
+        <TrafficChart tvStats={downloadStats} dvStats={transcodeStats} title="下载任务分布" type="tv" />
+        <TrafficChart tvStats={downloadStats} dvStats={transcodeStats} title="转译任务分布" type="dv" />
       </div>
 
       {/* 最近任务 */}
       <div className="grid gap-6 md:grid-cols-2">
-        {/* TV 任务 */}
+        {/* 下载任务 */}
         <Card>
           <CardHeader>
             <CardTitle>最近下载任务</CardTitle>
-            <CardDescription>TV 视频下载服务最新任务</CardDescription>
+            <CardDescription>DV 视频下载服务最新任务</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -88,9 +91,9 @@ export default function DashboardPage() {
                   <div key={i} className="h-12 animate-pulse rounded bg-muted" />
                 ))}
               </div>
-            ) : recentTvTasks.length > 0 ? (
+            ) : recentDownloadTasks.length > 0 ? (
               <div className="space-y-3">
-                {recentTvTasks.map((task) => (
+                {recentDownloadTasks.map((task) => (
                   <div
                     key={task.id}
                     className="flex items-center justify-between rounded-lg border p-3"
@@ -113,11 +116,11 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* DV 任务 */}
+        {/* 转译任务 */}
         <Card>
           <CardHeader>
             <CardTitle>最近转译任务</CardTitle>
-            <CardDescription>DV 语音转文字服务最新任务</CardDescription>
+            <CardDescription>TV 语音转文字服务最新任务</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
@@ -126,9 +129,9 @@ export default function DashboardPage() {
                   <div key={i} className="h-12 animate-pulse rounded bg-muted" />
                 ))}
               </div>
-            ) : recentDvTasks.length > 0 ? (
+            ) : recentTranscodeTasks.length > 0 ? (
               <div className="space-y-3">
-                {recentDvTasks.map((task) => (
+                {recentTranscodeTasks.map((task) => (
                   <div
                     key={task.id}
                     className="flex items-center justify-between rounded-lg border p-3"
@@ -136,7 +139,7 @@ export default function DashboardPage() {
                     <div className="flex-1 min-w-0">
                       <p className="truncate text-sm font-medium">{task.url}</p>
                       <p className="text-xs text-muted-foreground">
-                        {task.createdAt ? formatDate(task.createdAt) : '-'}
+                        {task.createdAt ? formatDate(task.createdAt) : (task.created_at ? formatDate(parseInt(task.created_at)) : '-')}
                       </p>
                     </div>
                     <Badge className={getStatusColor(task.status)}>

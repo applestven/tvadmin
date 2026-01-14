@@ -135,6 +135,21 @@
                 ]
             }
         },
+        "/tts/stats": {
+            "get": {
+                "operationId": "TaskController_getTaskStats",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "summary": "获取任务统计信息",
+                "tags": [
+                    "TTS 任务"
+                ]
+            }
+        },
         "/tts/sse": {
             "get": {
                 "operationId": "TaskController_sseTaskStatus",

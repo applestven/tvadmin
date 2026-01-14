@@ -6,12 +6,19 @@ export interface ApiResponse<T = unknown> {
 }
 
 export interface PaginatedResponse<T> {
-    code: number
+    code?: number
     data: T[]
-    total: number
-    page: number
-    pageSize: number
+    total?: number
+    page?: number
+    pageSize?: number
     message?: string
+    // TV 转译接口的分页结构
+    pagination?: {
+        page: number
+        pageSize: number
+        total: number
+        totalPages: number
+    }
 }
 
 export interface HealthStatus {
