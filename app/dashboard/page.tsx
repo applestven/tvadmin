@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { StatsCards } from '@/components/charts/StatsCards'
 import { TrafficChart } from '@/components/charts/TrafficChart'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { useTvApi, useDvApi } from '@/hooks'
 import { getStatusColor, getStatusText, formatDate } from '@/lib/utils'
+import { RefreshCw } from 'lucide-react'
 import type { TvTask, DvTask, TvTaskStats, DvTaskStats } from '@/types'
 
 export default function DashboardPage() {
@@ -21,27 +23,35 @@ export default function DashboardPage() {
   const downloadApi = useTvApi()  // DV 服务 - 下载
   const transcodeApi = useDvApi() // TV 服务 - 转译
 
+  // 使用 ref 保存 API 引用，避免依赖变化导致的无限循环
+  const downloadApiRef = useRef(downloadApi)
+  const transcodeApiRef = useRef(transcodeApi)
+  downloadApiRef.current = downloadApi
+  transcodeApiRef.current = transcodeApi
+
   const fetchData = async () => {
     setLoading(true)
     try {
-      // 获取下载任务 (DV)
-      const downloadTasksResponse = await downloadApi.getTasks({ page: 1, limit: 5 })
+      // 并行获取所有数据
+      const [downloadTasksResponse, transcodeTasksResponse, downloadStatsData, transcodeStatsData] = await Promise.all([
+        downloadApiRef.current.getTasks({ page: 1, limit: 5 }),
+        transcodeApiRef.current.getTasks({ page: 1, pageSize: 5 }),
+        downloadApiRef.current.getStats(),
+        transcodeApiRef.current.getStats(),
+      ])
+
+      // 设置下载任务
       if (downloadTasksResponse?.data) {
         setRecentDownloadTasks(downloadTasksResponse.data)
       }
 
-      // 获取转译任务 (TV)
-      const transcodeTasksResponse = await transcodeApi.getTasks({ page: 1, pageSize: 5 })
+      // 设置转译任务
       if (transcodeTasksResponse?.data) {
         setRecentTranscodeTasks(transcodeTasksResponse.data)
       }
 
-      // 获取下载统计 (DV /stats)
-      const downloadStatsData = await downloadApi.getStats()
+      // 设置统计数据
       setDownloadStats(downloadStatsData)
-
-      // 获取转译统计 (TV /tts/stats)
-      const transcodeStatsData = await transcodeApi.getStats()
       setTranscodeStats(transcodeStatsData)
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error)
@@ -56,15 +66,21 @@ export default function DashboardPage() {
     // 30秒自动刷新
     const interval = setInterval(fetchData, 30000)
     return () => clearInterval(interval)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">仪表盘</h2>
-        <p className="text-muted-foreground">
-          系统运行状态概览
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">仪表盘</h2>
+          <p className="text-muted-foreground">
+            系统运行状态概览
+          </p>
+        </div>
+        <Button variant="outline" size="icon" onClick={fetchData} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
       </div>
 
       {/* 统计卡片 */}

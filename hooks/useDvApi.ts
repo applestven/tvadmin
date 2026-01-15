@@ -130,20 +130,30 @@ export function useDvApi() {
     }, [])
 
     // 获取统计数据 (TV /tts/stats 接口)
+    // 接口返回：{ totalTasks, runningTasks, failedTasks, activeSseConnections }
     const getStats = useCallback(async (): Promise<DvTaskStats> => {
         setLoading(true)
         setError(null)
 
         try {
-            const response = await apiGet<ApiResponse<DvTaskStats>>('/api/tv/tts/stats')
+            interface TtsStatsResponse {
+                totalTasks: number
+                runningTasks: number
+                failedTasks: number
+                activeSseConnections: number
+            }
+            const response = await apiGet<TtsStatsResponse>('/api/tv/tts/stats')
+
+            // 计算成功数 = 总数 - 运行中 - 失败
+            const successCount = (response.totalTasks || 0) - (response.runningTasks || 0) - (response.failedTasks || 0)
 
             const stats: DvTaskStats = {
-                total: response.data?.total || 0,
-                pending: response.data?.pending || 0,
-                queued: response.data?.queued || 0,
-                running: response.data?.running || 0,
-                success: response.data?.success || 0,
-                failed: response.data?.failed || 0,
+                total: response.totalTasks || 0,
+                pending: 0,
+                queued: 0,
+                running: response.runningTasks || 0,
+                success: successCount > 0 ? successCount : 0,
+                failed: response.failedTasks || 0,
             }
 
             return stats
