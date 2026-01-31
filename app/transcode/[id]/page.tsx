@@ -1,64 +1,125 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Separator } from '@/components/ui/separator'
-import { useDvApi } from '@/hooks'
-import { getStatusColor, getStatusText, formatDate, formatDuration } from '@/lib/utils'
-import { ArrowLeft, RefreshCw, ExternalLink, Trash2 } from 'lucide-react'
-import type { DvTask } from '@/types'
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useDvApi } from "@/hooks";
+import {
+  getStatusColor,
+  getStatusText,
+  formatDate,
+  formatDuration,
+} from "@/lib/utils";
+import { ArrowLeft, RefreshCw, ExternalLink, Trash2, Download, Copy } from "lucide-react";
+import type { DvTask } from "@/types";
 
 export default function TranscodeDetailPage() {
-  const params = useParams()
-  const router = useRouter()
-  const [task, setTask] = useState<DvTask | null>(null)
-  const [loading, setLoading] = useState(true)
+  const params = useParams();
+  const router = useRouter();
+  const [task, setTask] = useState<DvTask | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [subtitleText, setSubtitleText] = useState("");
+  const [subtitleLoading, setSubtitleLoading] = useState(false);
+  const [subtitleError, setSubtitleError] = useState<string | null>(null);
 
-  const { getTaskDetail, cancelTask } = useDvApi()
+  const { getTaskDetail, cancelTask } = useDvApi();
 
   const fetchTask = async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const data = await getTaskDetail(params.id as string)
+      const data = await getTaskDetail(params?.id as string);
       if (data) {
-        setTask(data)
+        setTask(data);
       }
     } catch (error) {
-      console.error('Failed to fetch task:', error)
+      console.error("Failed to fetch task:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
+
+  const getOutputName = (t?: DvTask | null) => t?.output_name || (t as any)?.outputName;
+  const getLocation = (t?: DvTask | null) => (t?.location ?? "").replace(/\/$/, "");
+  const getSrtDownloadUrl = (t?: DvTask | null) => {
+    const loc = getLocation(t);
+    const out = getOutputName(t);
+    if (!loc || !out) return "";
+    return `${loc}:6789/static/${out}`;
+  };
+  const getSrtToTxtUrl = (t?: DvTask | null) => {
+    const loc = getLocation(t);
+    const out = getOutputName(t);
+    if (!loc || !out) return "";
+    return `${loc}:6789/tts/srt-to-txt?file=${encodeURIComponent(out)}`;
+  };
+
+  const fetchSubtitleText = async (t?: DvTask | null) => {
+    const url = getSrtToTxtUrl(t ?? task);
+    if (!url) return;
+    setSubtitleLoading(true);
+    setSubtitleError(null);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("srt to txt failed");
+      const txt = await res.text();
+      setSubtitleText(txt ?? "");
+    } catch (e: any) {
+      console.error("Failed to fetch subtitle text:", e);
+      setSubtitleError(e?.message || "获取字幕文本失败");
+    } finally {
+      setSubtitleLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (params.id) {
-      fetchTask()
+    if (params?.id) {
+      fetchTask();
     }
-  }, [params.id])
+  }, [params?.id]);
 
-  // 运行中的任务自动刷新
   useEffect(() => {
-    if (task?.status === 'running' || task?.status === 'queued') {
-      const interval = setInterval(fetchTask, 5000)
-      return () => clearInterval(interval)
+    if (task?.status === "running" || task?.status === "queued") {
+      const interval = setInterval(fetchTask, 5000);
+      return () => clearInterval(interval);
     }
-  }, [task?.status])
+  }, [task?.status]);
+
+  useEffect(() => {
+    if (task?.status === "success" && getOutputName(task) && getLocation(task)) {
+      fetchSubtitleText(task);
+    }
+  }, [task?.status, task?.output_name, task?.location]);
 
   const handleCancel = async () => {
-    if (!task) return
-    if (confirm('确定要取消这个任务吗？')) {
+    if (!task) return;
+    if (confirm("确定要取消这个任务吗？")) {
       try {
-        await cancelTask(task.id)
-        fetchTask()
+        await cancelTask(task.id);
+        fetchTask();
       } catch (error) {
-        console.error('Failed to cancel task:', error)
+        console.error("Failed to cancel task:", error);
       }
     }
-  }
+  };
+
+  const handleCopyText = async () => {
+    try {
+      await navigator.clipboard.writeText(subtitleText || "");
+    } catch (e) {
+      console.error("复制失败", e);
+    }
+  };
 
   if (loading) {
     return (
@@ -66,7 +127,7 @@ export default function TranscodeDetailPage() {
         <div className="h-8 w-48 animate-pulse rounded bg-muted" />
         <div className="h-64 animate-pulse rounded bg-muted" />
       </div>
-    )
+    );
   }
 
   if (!task) {
@@ -78,12 +139,13 @@ export default function TranscodeDetailPage() {
           返回
         </Button>
       </div>
-    )
+    );
   }
 
-  const duration = task.finishedAt && task.startedAt
-    ? formatDuration(task.finishedAt - task.startedAt)
-    : '-'
+  const duration =
+    task.finishedAt && task.startedAt
+      ? formatDuration(task.finishedAt - task.startedAt)
+      : "-";
 
   return (
     <div className="space-y-6">
@@ -98,7 +160,7 @@ export default function TranscodeDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {(task.status === 'pending' || task.status === 'queued') && (
+          {(task.status === "pending" || task.status === "queued") && (
             <Button variant="destructive" onClick={handleCancel}>
               <Trash2 className="mr-2 h-4 w-4" />
               取消任务
@@ -110,8 +172,7 @@ export default function TranscodeDetailPage() {
         </div>
       </div>
 
-      {/* 进度条 (运行中显示) */}
-      {task.status === 'running' && task.progress !== undefined && (
+      {task.status === "running" && task.progress !== undefined && (
         <Card>
           <CardHeader>
             <CardTitle>转译进度</CardTitle>
@@ -119,14 +180,15 @@ export default function TranscodeDetailPage() {
           <CardContent>
             <div className="space-y-2">
               <Progress value={task.progress} className="h-4" />
-              <p className="text-center text-sm font-medium">{task.progress}%</p>
+              <p className="text-center text-sm font-medium">
+                {task.progress}%
+              </p>
             </div>
           </CardContent>
         </Card>
       )}
 
       <div className="grid gap-6 md:grid-cols-2">
-        {/* 基本信息 */}
         <Card>
           <CardHeader>
             <CardTitle>基本信息</CardTitle>
@@ -147,17 +209,16 @@ export default function TranscodeDetailPage() {
             <Separator />
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">执行位置</span>
-              <span>{task.location || '-'}</span>
+              <span>{task.location || "-"}</span>
             </div>
             <Separator />
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">语言</span>
-              <span>{task.languageArray || '-'}</span>
+              <span>{task.languageArray || "-"}</span>
             </div>
           </CardContent>
         </Card>
 
-        {/* 时间信息 */}
         <Card>
           <CardHeader>
             <CardTitle>时间信息</CardTitle>
@@ -166,17 +227,17 @@ export default function TranscodeDetailPage() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">创建时间</span>
-              <span>{task.createdAt ? formatDate(task.createdAt) : '-'}</span>
+              <span>{task.createdAt ? formatDate(task.createdAt) : "-"}</span>
             </div>
             <Separator />
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">开始时间</span>
-              <span>{task.startedAt ? formatDate(task.startedAt) : '-'}</span>
+              <span>{task.startedAt ? formatDate(task.startedAt) : "-"}</span>
             </div>
             <Separator />
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">完成时间</span>
-              <span>{task.finishedAt ? formatDate(task.finishedAt) : '-'}</span>
+              <span>{task.finishedAt ? formatDate(task.finishedAt) : "-"}</span>
             </div>
             <Separator />
             <div className="flex items-center justify-between">
@@ -186,7 +247,6 @@ export default function TranscodeDetailPage() {
           </CardContent>
         </Card>
 
-        {/* URL 信息 */}
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>URL 信息</CardTitle>
@@ -216,7 +276,42 @@ export default function TranscodeDetailPage() {
           </CardContent>
         </Card>
 
-        {/* 错误信息 */}
+        {task.status === "success" && getOutputName(task) && getLocation(task) && (
+          <Card className="md:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle>字幕与文本</CardTitle>
+                <CardDescription>下载字幕文件并查看提取的文本</CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <a href={getSrtDownloadUrl(task)} download>
+                  <Button variant="outline">
+                    <Download className="mr-2 h-4 w-4" /> 下载字幕
+                  </Button>
+                </a>
+                <Button variant="outline" onClick={() => fetchSubtitleText(task)} disabled={subtitleLoading}>
+                  <RefreshCw className={`mr-2 h-4 w-4 ${subtitleLoading ? "animate-spin" : ""}`} /> 刷新文本
+                </Button>
+                <Button variant="outline" onClick={handleCopyText} disabled={!subtitleText}>
+                  <Copy className="mr-2 h-4 w-4" /> 复制文本
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {subtitleError && (
+                  <p className="text-sm text-destructive">{subtitleError}</p>
+                )}
+                <ScrollArea className="h-48 rounded border p-3 bg-muted/30">
+                  <pre className="whitespace-pre-wrap text-sm">
+                    {subtitleLoading ? "加载中..." : (subtitleText || "暂无文本")}
+                  </pre>
+                </ScrollArea>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {task.error && (
           <Card className="md:col-span-2 border-destructive">
             <CardHeader>
@@ -231,5 +326,5 @@ export default function TranscodeDetailPage() {
         )}
       </div>
     </div>
-  )
+  );
 }
