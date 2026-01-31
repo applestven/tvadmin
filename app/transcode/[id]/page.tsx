@@ -21,7 +21,14 @@ import {
   formatDate,
   formatDuration,
 } from "@/lib/utils";
-import { ArrowLeft, RefreshCw, ExternalLink, Trash2, Download, Copy } from "lucide-react";
+import {
+  ArrowLeft,
+  RefreshCw,
+  ExternalLink,
+  Trash2,
+  Download,
+  Copy,
+} from "lucide-react";
 import type { DvTask } from "@/types";
 
 export default function TranscodeDetailPage() {
@@ -49,8 +56,10 @@ export default function TranscodeDetailPage() {
     }
   };
 
-  const getOutputName = (t?: DvTask | null) => t?.output_name || (t as any)?.outputName;
-  const getLocation = (t?: DvTask | null) => (t?.location ?? "").replace(/\/$/, "");
+  const getOutputName = (t?: DvTask | null) =>
+    t?.output_name || (t as any)?.outputName;
+  const getLocation = (t?: DvTask | null) =>
+    (t?.location ?? "").replace(/\/$/, "");
   const getSrtDownloadUrl = (t?: DvTask | null) => {
     const loc = getLocation(t);
     const out = getOutputName(t);
@@ -96,7 +105,11 @@ export default function TranscodeDetailPage() {
   }, [task?.status]);
 
   useEffect(() => {
-    if (task?.status === "success" && getOutputName(task) && getLocation(task)) {
+    if (
+      task?.status === "success" &&
+      getOutputName(task) &&
+      getLocation(task)
+    ) {
       fetchSubtitleText(task);
     }
   }, [task?.status, task?.output_name, task?.location]);
@@ -276,41 +289,60 @@ export default function TranscodeDetailPage() {
           </CardContent>
         </Card>
 
-        {task.status === "success" && getOutputName(task) && getLocation(task) && (
-          <Card className="md:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle>字幕与文本</CardTitle>
-                <CardDescription>下载字幕文件并查看提取的文本</CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <a href={getSrtDownloadUrl(task)} download>
-                  <Button variant="outline">
-                    <Download className="mr-2 h-4 w-4" /> 下载字幕
+        {task.status === "success" &&
+          getOutputName(task) &&
+          getLocation(task) && (
+            <Card className="md:col-span-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <div>
+                  <CardTitle>字幕与文本</CardTitle>
+                  <CardDescription>
+                    下载字幕文件并查看提取的文本
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a href={getSrtDownloadUrl(task)} download>
+                    <Button variant="outline">
+                      <Download className="mr-2 h-4 w-4" /> 下载字幕
+                    </Button>
+                  </a>
+                  <Button
+                    variant="outline"
+                    onClick={() => fetchSubtitleText(task)}
+                    disabled={subtitleLoading}
+                  >
+                    <RefreshCw
+                      className={`mr-2 h-4 w-4 ${
+                        subtitleLoading ? "animate-spin" : ""
+                      }`}
+                    />{" "}
+                    刷新文本
                   </Button>
-                </a>
-                <Button variant="outline" onClick={() => fetchSubtitleText(task)} disabled={subtitleLoading}>
-                  <RefreshCw className={`mr-2 h-4 w-4 ${subtitleLoading ? "animate-spin" : ""}`} /> 刷新文本
-                </Button>
-                <Button variant="outline" onClick={handleCopyText} disabled={!subtitleText}>
-                  <Copy className="mr-2 h-4 w-4" /> 复制文本
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {subtitleError && (
-                  <p className="text-sm text-destructive">{subtitleError}</p>
-                )}
-                <ScrollArea className="h-48 rounded border p-3 bg-muted/30">
-                  <pre className="whitespace-pre-wrap text-sm">
-                    {subtitleLoading ? "加载中..." : (subtitleText || "暂无文本")}
-                  </pre>
-                </ScrollArea>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                  <Button
+                    variant="outline"
+                    onClick={handleCopyText}
+                    disabled={!subtitleText}
+                  >
+                    <Copy className="mr-2 h-4 w-4" /> 复制文本
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {subtitleError && (
+                    <p className="text-sm text-destructive">{subtitleError}</p>
+                  )}
+                  <ScrollArea className="h-48 rounded border p-3 bg-muted/30">
+                    <pre className="whitespace-pre-wrap text-sm">
+                      {subtitleLoading
+                        ? "加载中..."
+                        : subtitleText || "暂无文本"}
+                    </pre>
+                  </ScrollArea>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
         {task.error && (
           <Card className="md:col-span-2 border-destructive">
