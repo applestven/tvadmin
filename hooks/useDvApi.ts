@@ -46,8 +46,12 @@ export function useDvApi() {
         setError(null)
 
         try {
-            const response = await apiGet<ApiResponse<DvTask>>(`/api/tv/tts/${id}`)
-            return response.data
+            const response = await apiGet<ApiResponse<DvTask> | DvTask>(`/api/tv/tts/${id}`)
+            // 兼容两种返回：
+            // 1) 直接返回任务对象
+            // 2) 返回 { data: task }
+            const task = (response as any)?.data ?? response
+            return task as DvTask
         } catch (err) {
             const message = err instanceof Error ? err.message : '获取任务详情失败'
             setError(message)
