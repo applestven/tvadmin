@@ -37,7 +37,7 @@ module.exports = {
     // deploy: {
     //     production: {
     //         user: 'ubuntu',
-    //         host: '43.139.236.50',
+    //         host: '139.199.192.179',
     //         ref: 'origin/main',
     //         repo: 'git@github.com:applestven/tvadmin.git',
     //         path: '/home/ubuntu/apps/tvadmin',
